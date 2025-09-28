@@ -1,4 +1,4 @@
-# -English-word-search-and-memory-system-6-
+# -English-word-search-and-memory-system-
 # 英语单词查询 and 记忆系统 📚
 
 ## 应用简介
