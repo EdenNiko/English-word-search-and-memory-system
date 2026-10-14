@@ -198,24 +198,49 @@ class WordStudySystem {
     
     async fetchWordFromAPI(word) {
         try {
-            // 使用Free Dictionary API
-            const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
-            
+            // 使用Free Dictionary API（设置超时，该服务经常返回522超时）
+            const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`,
+                { signal: AbortSignal.timeout(6000) });
+
             if (!response.ok) {
                 throw new Error('Word not found');
             }
-            
+
             const data = await response.json();
-            
+
             // 调试信息
             console.log('API原始数据:', data[0]);
-            
+
             const parsedData = this.parseAPIResponse(data[0]);
             console.log('解析后的数据:', parsedData);
-            
+
             return parsedData;
         } catch (error) {
-            console.log('API查询失败');
+            console.log('Free Dictionary API查询失败，尝试备用API');
+            return this.fetchWordFromDatamuse(word);
+        }
+    }
+
+    // 备用API：Datamuse，只提供词性，变形由本地规则推断
+    async fetchWordFromDatamuse(word) {
+        try {
+            const response = await fetch(`https://api.datamuse.com/words?sp=${encodeURIComponent(word)}&md=p&max=1`,
+                { signal: AbortSignal.timeout(6000) });
+            if (!response.ok) return null;
+
+            const data = await response.json();
+            const entry = data[0];
+            if (!entry || entry.word.toLowerCase() !== word || !entry.tags) return null;
+
+            const posMap = { v: 'verb', n: 'noun', adj: 'adjective', adv: 'adverb' };
+            const meanings = entry.tags
+                .filter(tag => posMap[tag])
+                .map(tag => ({ partOfSpeech: posMap[tag], definitions: [] }));
+            if (meanings.length === 0) return null;
+
+            return this.parseAPIResponse({ word: entry.word, meanings });
+        } catch (error) {
+            console.log('备用API查询失败');
             return null;
         }
     }
